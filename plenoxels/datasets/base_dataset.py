@@ -111,8 +111,8 @@ class BaseDataset(Dataset, ABC):
             out["rays_o"] = self.rays_o[index]
         if self.rays_d is not None:
             out["rays_d"] = self.rays_d[index]
-        if self.imgs is not None:
-            out["imgs"] = self.imgs[index]
+        if self.imgs is not None: # [64000000, 4]
+            out["imgs"] = self.imgs[index] #[4096, 4]
         else:
             out["imgs"] = None
         if return_idxs:

@@ -51,7 +51,7 @@ class LLFFDataset(BaseDataset):
                 near_scaling=self.near_scaling)
             imgs = load_llff_images(image_paths, intrinsics, split)
             imgs = (imgs * 255).to(torch.uint8)
-            if split == 'train':
+            if split == 'train': #todo should we keep this way and why?
                 imgs = imgs.view(-1, imgs.shape[-1])
             else:
                 imgs = imgs.view(-1, intrinsics.height * intrinsics.width, imgs.shape[-1])

@@ -21,7 +21,7 @@ from plenoxels.runners.regularization import Regularizer
 from plenoxels.ops.lr_scheduling import (
     get_cosine_schedule_with_warmup, get_step_schedule_with_warmup
 )
-
+from .robustnerf import  robustnerf_mask
 
 class BaseTrainer(abc.ABC):
     def __init__(self,
@@ -34,6 +34,7 @@ class BaseTrainer(abc.ABC):
                  valid_every: int,
                  save_outputs: bool,
                  device: Union[str, torch.device],
+                 robustnerf,
                  **kwargs):
         self.train_data_loader = train_data_loader
         self.num_steps = num_steps
@@ -59,6 +60,7 @@ class BaseTrainer(abc.ABC):
         self.criterion = torch.nn.MSELoss(reduction='mean')
         self.regularizers = self.init_regularizers(**self.extra_args)
         self.gscaler = torch.cuda.amp.GradScaler(enabled=self.train_fp16)
+        self.robustnerf = robustnerf
 
         self.model.to(self.device)
 
@@ -67,7 +69,8 @@ class BaseTrainer(abc.ABC):
         self.model.eval()
         return None  # noqa
 
-    def train_step(self, data, **kwargs) -> bool:
+    def train_step(self, data, loss_threshold, **kwargs) -> bool:
+        stats = {}
         self.model.train()
         data = self._move_data_to_device(data)
         if "timestamps" not in data:
@@ -76,13 +79,22 @@ class BaseTrainer(abc.ABC):
 
         with torch.cuda.amp.autocast(enabled=self.train_fp16):
             fwd_out = self.model(
-                data['rays_o'], data['rays_d'], bg_color=data['bg_color'],
+                data['rays_o'], #[4096, 3]
+                data['rays_d'], #[4096, 3]
+                bg_color=data['bg_color'], #[1, 3]
                 near_far=data['near_fars'], timestamps=data['timestamps'])
             self.timer.check("model-forward")
             # Reconstruction loss
             recon_loss = self.criterion(fwd_out['rgb'], data['imgs'])
             # Regularization
             loss = recon_loss
+            if self.robustnerf['enable']:
+                resid_sq = (fwd_out['rgb'] -  data['imgs'])**2
+                mask, robust_stats = robustnerf_mask(resid_sq, loss_threshold, self.robustnerf)
+                mask = mask.to(self.device)
+                loss = resid_sq * mask
+                loss = loss.mean()
+                stats['loss_threshold'] = robust_stats['loss_threshold']
             for r in self.regularizers:
                 reg_loss = r.regularize(self.model, model_out=fwd_out)
                 loss = loss + reg_loss
@@ -105,7 +117,7 @@ class BaseTrainer(abc.ABC):
                 for r in self.regularizers:
                     r.report(self.loss_info)
 
-        return scale <= self.gscaler.get_scale()
+        return scale <= self.gscaler.get_scale(), stats
 
     def post_step(self, progress_bar):
         self.model.step_after_iter(self.global_step)
@@ -142,6 +154,7 @@ class BaseTrainer(abc.ABC):
         try:
             self.pre_epoch()
             batch_iter = iter(self.train_data_loader)
+            loss_threshold = 1.0
             while self.global_step < self.num_steps:
                 self.timer.reset()
                 self.model.step_before_iter(self.global_step)
@@ -157,7 +170,10 @@ class BaseTrainer(abc.ABC):
                     log.info("Reset data-iterator")
 
                 try:
-                    step_successful = self.train_step(data)
+                    step_successful, stats = self.train_step(data, loss_threshold)
+                    if self.robustnerf['enable']:
+                        loss_threshold = np.mean(stats['loss_threshold'])
+
                 except StopIteration:
                     self.pre_epoch()
                     batch_iter = iter(self.train_data_loader)

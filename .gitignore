@@ -31,3 +31,4 @@ autodidact/
 assets/
 
 tmp
+.vscode/

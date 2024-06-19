@@ -31,12 +31,14 @@ class StaticTrainer(BaseTrainer):
                  valid_every: int,
                  save_outputs: bool,
                  device: Union[str, torch.device],
+                 robustnerf,
                  **kwargs
                  ):
         self.test_dataset = ts_dset
         self.train_dataset = tr_dset
         self.is_ndc = self.test_dataset.is_ndc
         self.is_contracted = self.test_dataset.is_contracted
+        self.robustnerf = robustnerf
 
         super().__init__(
             train_data_loader=tr_loader,
@@ -48,6 +50,7 @@ class StaticTrainer(BaseTrainer):
             valid_every=valid_every,
             save_outputs=save_outputs,
             device=device,
+            robustnerf=robustnerf,
             **kwargs
         )
 
@@ -78,8 +81,8 @@ class StaticTrainer(BaseTrainer):
                         preds[k].append(v.cpu())
         return {k: torch.cat(v, 0) for k, v in preds.items()}
 
-    def train_step(self, data: Dict[str, Union[int, torch.Tensor]], **kwargs):
-        return super().train_step(data, **kwargs)
+    def train_step(self, data: Dict[str, Union[int, torch.Tensor]], loss_threshold, **kwargs):
+        return super().train_step(data, loss_threshold, **kwargs)
 
     def post_step(self, progress_bar):
         super().post_step(progress_bar)

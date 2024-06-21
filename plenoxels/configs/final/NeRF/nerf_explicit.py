@@ -52,4 +52,15 @@ config = {
   'output_coordinate_dim': 32,
   'resolution': [128, 128, 128]
  }],
+
+ # RobustNeRF
+ 'robustnerf': {
+   'enable': True,
+   'inlier_quantile': 0.5,
+   'inner_patch_inlier_quantile': 0.5,
+   'smoothed_filter_size': 3,
+   'inner_patch_size': 8,
+   'smoothed_filter_size': 3,
+   'smoothed_inlier_quantile': 0.5
+ }
 }

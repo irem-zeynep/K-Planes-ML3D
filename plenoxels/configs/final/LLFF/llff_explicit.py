@@ -5,7 +5,7 @@ config = {
 
     # Data settings
     "data_downsample": 4,
-    "data_dirs": ["data/LLFF/fortress"],
+    "data_dirs": ["/content/drive/MyDrive/TUM/3d-machine-learning/K-Planes/data/nerf_llff_data/fern"],
     # Data settings for LLFF
     "hold_every": 8,
     "contract": False,
@@ -60,4 +60,12 @@ config = {
         "grid_dimensions": 2,
         "resolution": [64, 64, 64],
     }],
+
+    # Depth Loss
+    'depth_loss': {
+      'enable': True,
+      'weighted': False,
+      'relative_loss': False,
+      'alpha': 0.1
+    }
 }

@@ -154,7 +154,7 @@ def decide_dset_type(dd) -> str:
 
 def init_tr_data(data_downsample: float, data_dirs: Sequence[str], **kwargs):
     batch_size = int(kwargs['batch_size'])
-    assert len(data_dirs) == 1
+    assert len(data_dirs) == 1 # TODO why?
     data_dir = data_dirs[0]
 
     dset_type = decide_dset_type(data_dir)

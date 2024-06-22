@@ -34,6 +34,7 @@ class BaseTrainer(abc.ABC):
                  valid_every: int,
                  save_outputs: bool,
                  device: Union[str, torch.device],
+                 depth_loss,
                  **kwargs):
         self.train_data_loader = train_data_loader
         self.num_steps = num_steps
@@ -59,6 +60,7 @@ class BaseTrainer(abc.ABC):
         self.criterion = torch.nn.MSELoss(reduction='mean')
         self.regularizers = self.init_regularizers(**self.extra_args)
         self.gscaler = torch.cuda.amp.GradScaler(enabled=self.train_fp16)
+        self.depth_loss_conf = depth_loss
 
         self.model.to(self.device)
 
@@ -68,6 +70,9 @@ class BaseTrainer(abc.ABC):
         return None  # noqa
 
     def train_step(self, data, **kwargs) -> bool:
+        img2mse = lambda x, y : torch.mean((x - y) ** 2)
+
+        stats = {}
         self.model.train()
         data = self._move_data_to_device(data)
         if "timestamps" not in data:
@@ -81,8 +86,27 @@ class BaseTrainer(abc.ABC):
             self.timer.check("model-forward")
             # Reconstruction loss
             recon_loss = self.criterion(fwd_out['rgb'], data['imgs'])
-            # Regularization
             loss = recon_loss
+
+            depth_loss = 0  
+            if self.depth_loss_conf['enable']:
+                # TODO get target and weights
+                target_depth = data['rays_depth']
+                ray_weights = data['rays_depth']
+
+                if self.depth_loss_conf["weighted"]:
+                    if not self.depth_loss_conf["normalize_depth"]:
+                        depth_loss = torch.mean(((fwd_out['depth'] - target_depth) ** 2) * ray_weights)
+                    else: # todo fix normalized loss (replace / 1 with / max depth)
+                        depth_loss = torch.mean((((fwd_out['depth']  - target_depth) / 1) ** 2) * ray_weights)
+                elif self.depth_loss_conf["relative_loss"]:
+                    depth_loss = torch.mean(((fwd_out['depth']  - target_depth) / target_depth)**2)
+                else:
+                    depth_loss = img2mse(fwd_out['depth'] , target_depth)
+
+            loss += + self.depth_loss_conf['alpha'] * depth_loss
+            
+            # Regularization
             for r in self.regularizers:
                 reg_loss = r.regularize(self.model, model_out=fwd_out)
                 loss = loss + reg_loss

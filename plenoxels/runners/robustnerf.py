@@ -21,7 +21,9 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
     stats: { str: f32[] }. Statistics to pass on.
   """
   epsilon = 1e-3
-  errors = jnp.array(errors.cpu().detach().numpy()) # [4096, 3]
+  #errors = jnp.array(errors.cpu().detach().numpy()) # [4096, 3]
+  batch_size, _ = errors.shape
+  errors = jnp.array(errors.view(1, config['patch_size'], config['patch_size'], 3).cpu().detach().numpy())
 
   error_dtype = errors.dtype
 
@@ -40,7 +42,7 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   ### Computes the fraction of inlier pixels
   stats['is_inlier_loss'] = jnp.mean(is_inlier_pixel, dtype=error_dtype)
 
-  '''
+
   # Apply fxf (3x3) box filter 'window' for smoothing (diffusion).
   f = config['smoothed_filter_size']
 
@@ -76,7 +78,6 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   inner_patch_mask = _robustnerf_inner_patch_mask(
       config['inner_patch_size'], config['patch_size']
   )
-  '''
 
   is_inlier_patch = jnp.mean(
       is_inlier_pixel, axis=[0], keepdims=True
@@ -86,7 +87,8 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   is_inlier_patch = (
       is_inlier_patch > 1 - config['inner_patch_inlier_quantile']
   ).astype(error_dtype)
-  # is_inlier_patch = is_inlier_patch * inner_patch_mask
+
+  is_inlier_patch = is_inlier_patch * inner_patch_mask
   stats['is_inlier_patch'] = jnp.mean(is_inlier_patch)
 
   # A pixel is an inlier if it is an inlier according to any of the above
@@ -97,6 +99,8 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
 
   stats['mask'] = jnp.mean(mask)
 
+  # TODO replace hard coded values
+  mask = np.array(mask).reshape((batch_size, 1))
   mask = torch.from_numpy(np.array(mask))
   return mask, stats
 

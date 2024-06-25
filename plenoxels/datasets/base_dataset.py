@@ -7,7 +7,6 @@ from torch.utils.data import Dataset
 
 from .intrinsics import Intrinsics
 
-
 class BaseDataset(Dataset, ABC):
     def __init__(self,
                  datadir: str,
@@ -22,6 +21,7 @@ class BaseDataset(Dataset, ABC):
                  imgs: Optional[Union[torch.Tensor, List[torch.Tensor]]] = None,
                  sampling_weights: Optional[torch.Tensor] = None,
                  weights_subsampled: int = 1,
+                 num_imgs: Optional[int] = None,
                  ):
         self.datadir = datadir
         self.name = os.path.basename(self.datadir)
@@ -55,6 +55,7 @@ class BaseDataset(Dataset, ABC):
         else:
             self.use_permutation = True
         self.perm = None
+        self.num_imgs = num_imgs
 
     @property
     def img_h(self) -> Union[int, List[int]]:
@@ -97,6 +98,40 @@ class BaseDataset(Dataset, ABC):
             else:
                 return torch.randint(0, self.num_samples, size=(batch_size, ))
 
+    def get_rand_patch(self):
+        assert self.batch_size is not None, "Can't get rand_ids for test split"
+        assert self.num_imgs is not None, "Selection of random patch needs number of images"
+        batch_size = self.batch_size
+        num_imgs = self.num_imgs
+        img_h = self.img_h
+        img_w = self.img_w
+
+        assert torch.equal(torch.sqrt(torch.tensor(batch_size)), torch.sqrt(torch.tensor(batch_size)).round()), "Patch size must be quadratic"
+        patch_height = int(torch.sqrt(torch.tensor(batch_size)).item())
+        patch_width = int(torch.sqrt(torch.tensor(batch_size)).item())
+
+        image_idx = torch.randint(0, num_imgs, size=(1,)).item()
+
+        max_row_start = img_h - patch_height
+        max_col_start = img_w - patch_width
+        row_start = torch.randint(0, max_row_start + 1, (1,)).item()
+        col_start = torch.randint(0, max_col_start + 1, (1,)).item()
+        
+        # Debug purposes
+        # reshaped_imgs = self.imgs.clone().detach().view(num_imgs, img_h, img_w, 4)
+        # patch = reshaped_imgs.numpy()[image_idx, row_start:row_start+patch_height, col_start:col_start+patch_width, :]
+        # image = Image.fromarray((patch * 255).astype(np.uint8))
+        # image.save('patch_image.png')
+
+        index = []
+        for r in range(patch_height):
+            for c in range(patch_width):
+                original_index = image_idx * (img_h * img_w) + (row_start + r) * img_w + (col_start + c)
+                index.append(original_index)
+        index = torch.tensor(index)
+
+        return index
+
     def __len__(self):
         if self.split == 'train':
             return (self.num_samples + self.batch_size - 1) // self.batch_size
@@ -105,7 +140,9 @@ class BaseDataset(Dataset, ABC):
 
     def __getitem__(self, index, return_idxs: bool = False):
         if self.split == 'train':
-            index = self.get_rand_ids(index)
+            #index = self.get_rand_ids(index)
+            # TODO Add flag to get random patch when RobustNeRF loss is enabled
+            index = self.get_rand_patch()
         out = {}
         if self.rays_o is not None:
             out["rays_o"] = self.rays_o[index]

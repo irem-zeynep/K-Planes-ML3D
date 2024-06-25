@@ -39,6 +39,7 @@ class SyntheticNerfDataset(BaseDataset):
             intrinsics = load_360_intrinsics(
                 transform, img_h=imgs[0].shape[0], img_w=imgs[0].shape[1],
                 downsample=self.downsample)
+        num_imgs, _, _, _ = imgs.shape
         rays_o, rays_d, imgs = create_360_rays(
             imgs, poses, merge_all=split == 'train', intrinsics=intrinsics)
         super().__init__(
@@ -52,6 +53,7 @@ class SyntheticNerfDataset(BaseDataset):
             rays_o=rays_o,
             rays_d=rays_d,
             intrinsics=intrinsics,
+            num_imgs=num_imgs
         )
         log.info(f"SyntheticNerfDataset. Loaded {split} set from {datadir}."
                  f"{len(poses)} images of shape {self.img_h}x{self.img_w}. "

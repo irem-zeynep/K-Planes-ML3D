@@ -157,6 +157,7 @@ def decide_dset_type(dd) -> str:
 
 def init_tr_data(data_downsample: float, data_dirs: Sequence[str], **kwargs):
     batch_size = int(kwargs['batch_size'])
+    is_robust_loss_enabled = kwargs['robustnerf']['enable']
     assert len(data_dirs) == 1
     data_dir = data_dirs[0]
 
@@ -165,7 +166,7 @@ def init_tr_data(data_downsample: float, data_dirs: Sequence[str], **kwargs):
         max_tr_frames = parse_optint(kwargs.get('max_tr_frames'))
         dset = SyntheticNerfDataset(
             data_dir, split='train', downsample=data_downsample,
-            max_frames=max_tr_frames, batch_size=batch_size)
+            max_frames=max_tr_frames, batch_size=batch_size, is_robust_loss_enabled=is_robust_loss_enabled)
     elif dset_type == "llff":
         hold_every = parse_optint(kwargs.get('hold_every'))
         dset = LLFFDataset(

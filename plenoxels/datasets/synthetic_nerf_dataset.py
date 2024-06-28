@@ -18,7 +18,9 @@ class SyntheticNerfDataset(BaseDataset):
                  split: str,
                  batch_size: Optional[int] = None,
                  downsample: float = 1.0,
-                 max_frames: Optional[int] = None):
+                 max_frames: Optional[int] = None,
+                 is_robust_loss_enabled: Optional[bool] = False
+                 ):
         self.downsample = downsample
         self.max_frames = max_frames
         self.near_far = [2.0, 6.0]
@@ -53,7 +55,8 @@ class SyntheticNerfDataset(BaseDataset):
             rays_o=rays_o,
             rays_d=rays_d,
             intrinsics=intrinsics,
-            num_imgs=num_imgs
+            num_imgs=num_imgs,
+            is_robust_loss_enabled=is_robust_loss_enabled
         )
         log.info(f"SyntheticNerfDataset. Loaded {split} set from {datadir}."
                  f"{len(poses)} images of shape {self.img_h}x{self.img_w}. "

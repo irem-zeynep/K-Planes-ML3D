@@ -22,6 +22,7 @@ class BaseDataset(Dataset, ABC):
                  sampling_weights: Optional[torch.Tensor] = None,
                  weights_subsampled: int = 1,
                  num_imgs: Optional[int] = None,
+                 is_robust_loss_enabled: Optional[bool] = False
                  ):
         self.datadir = datadir
         self.name = os.path.basename(self.datadir)
@@ -56,6 +57,7 @@ class BaseDataset(Dataset, ABC):
             self.use_permutation = True
         self.perm = None
         self.num_imgs = num_imgs
+        self.is_robust_loss_enabled = is_robust_loss_enabled
 
     @property
     def img_h(self) -> Union[int, List[int]]:
@@ -99,8 +101,8 @@ class BaseDataset(Dataset, ABC):
                 return torch.randint(0, self.num_samples, size=(batch_size, ))
 
     def get_rand_patch(self):
-        assert self.batch_size is not None, "Can't get rand_ids for test split"
-        assert self.num_imgs is not None, "Selection of random patch needs number of images"
+        assert self.batch_size is not None, "Can't get rand_patches for test split"
+        assert self.num_imgs is not None, "Selection of random patch needs number of total train images"
         batch_size = self.batch_size
         num_imgs = self.num_imgs
         img_h = self.img_h
@@ -140,9 +142,10 @@ class BaseDataset(Dataset, ABC):
 
     def __getitem__(self, index, return_idxs: bool = False):
         if self.split == 'train':
-            #index = self.get_rand_ids(index)
-            # TODO Add flag to get random patch when RobustNeRF loss is enabled
-            index = self.get_rand_patch()
+            if self.is_robust_loss_enabled:
+                index = self.get_rand_patch()
+            else:
+                index = self.get_rand_ids(index)
         out = {}
         if self.rays_o is not None:
             out["rays_o"] = self.rays_o[index]

@@ -7,6 +7,8 @@ from torch.utils.data import Dataset
 
 from .intrinsics import Intrinsics
 
+import numpy as np
+
 class BaseDataset(Dataset, ABC):
     def __init__(self,
                  datadir: str,
@@ -151,9 +153,29 @@ class BaseDataset(Dataset, ABC):
             for c in range(patch_size):
                 original_index = image_idx * (img_h * img_w) + (row_start + r) * img_w + (col_start + c)
                 index.append(original_index)
-        index = torch.tensor(index)
+        index = np.asarray(index)
 
         return index
+    
+    # TODO translate to numpy
+    def rearrange_indices(self, blocks, num_patches_in_axis):
+        end_block = []
+        unit_block = []
+
+        cnt = 0
+        for block in blocks:
+            if cnt < num_patches_in_axis:
+                unit_block.append(block.copy())
+                cnt += 1
+
+                if cnt == num_patches_in_axis:
+                    end_block.append(unit_block.copy())
+                    unit_block = []
+                    cnt = 0
+
+        res = np.block(end_block)
+        return res.flatten()
+
     
     def construct_random_patch(self, index):
         import math
@@ -171,16 +193,19 @@ class BaseDataset(Dataset, ABC):
         
         assert window_size % patch_size == 0, f"Patches of {patch_size}x{patch_size} don't fit perfectly into {int(window_size)}x{int(window_size)} window"
 
-        num_patches_in_window = int(window_size / patch_size)**2
+        num_patches_in_axis = int(window_size / patch_size)
 
         if patch_size == 1:
             return self.get_rand_ids(index)
         else:
             patches = []
-            for i in range(num_patches_in_window):
+            for i in range(num_patches_in_axis ** 2):
                 image_idx = torch.randint(0, num_imgs, size=(1,)).item()
                 patch_indices = self.get_rand_patch_v2(image_idx)
-                patches.extend(patch_indices)
+                patches.append(patch_indices.reshape(patch_size, patch_size))
+
+            patches = np.asarray(patches)
+            patches = self.rearrange_indices(patches, num_patches_in_axis)
             return patches
 
     def __len__(self):
@@ -206,7 +231,6 @@ class BaseDataset(Dataset, ABC):
             reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 64, 64, 4)
             patch = reshaped_imgs.numpy()[0, 0:64, 0:64, :]
             from PIL import Image
-            import numpy as np
             image = Image.fromarray((patch * 255).astype(np.uint8))
             image.save('patch_image.png')
         else:

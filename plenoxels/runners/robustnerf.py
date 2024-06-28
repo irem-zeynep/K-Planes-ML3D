@@ -23,7 +23,7 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   epsilon = 1e-3
   #errors = jnp.array(errors.cpu().detach().numpy()) # [4096, 3]
   batch_size, _ = errors.shape
-  errors = jnp.array(errors.view(1, config['patch_size'], config['patch_size'], 3).cpu().detach().numpy())
+  errors = jnp.array(errors.view(1, config['patch_size2'], config['patch_size2'], 3).cpu().detach().numpy())
 
   error_dtype = errors.dtype
 
@@ -76,7 +76,7 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   # smaller than patch_size. Default is for the inner patch size to be half
   # the input patch size (i.e. 16x16 -> 8x8).
   inner_patch_mask = _robustnerf_inner_patch_mask(
-      config['inner_patch_size'], config['patch_size']
+      config['inner_patch_size'], config['patch_size2']
   )
 
   is_inlier_patch = jnp.mean(

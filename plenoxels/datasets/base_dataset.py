@@ -22,7 +22,8 @@ class BaseDataset(Dataset, ABC):
                  sampling_weights: Optional[torch.Tensor] = None,
                  weights_subsampled: int = 1,
                  num_imgs: Optional[int] = None,
-                 is_robust_loss_enabled: Optional[bool] = False
+                 is_robust_loss_enabled: Optional[bool] = False,
+                 patch_size: Optional[int] = None,
                  ):
         self.datadir = datadir
         self.name = os.path.basename(self.datadir)
@@ -58,6 +59,7 @@ class BaseDataset(Dataset, ABC):
         self.perm = None
         self.num_imgs = num_imgs
         self.is_robust_loss_enabled = is_robust_loss_enabled
+        self.patch_size = patch_size
 
     @property
     def img_h(self) -> Union[int, List[int]]:
@@ -133,6 +135,53 @@ class BaseDataset(Dataset, ABC):
         index = torch.tensor(index)
 
         return index
+    
+    def get_rand_patch_v2(self, image_idx):
+        img_h = self.img_h
+        img_w = self.img_w
+        patch_size = self.patch_size
+
+        max_row_start = img_h - patch_size
+        max_col_start = img_w - patch_size
+        row_start = torch.randint(0, max_row_start + 1, (1,)).item()
+        col_start = torch.randint(0, max_col_start + 1, (1,)).item()
+
+        index = []
+        for r in range(patch_size):
+            for c in range(patch_size):
+                original_index = image_idx * (img_h * img_w) + (row_start + r) * img_w + (col_start + c)
+                index.append(original_index)
+        index = torch.tensor(index)
+
+        return index
+    
+    def construct_random_patch(self, index):
+        import math
+
+        assert self.batch_size is not None, "Can't get rand_patches for test split"
+        assert self.num_imgs is not None, "Selection of random patches requires number of total train images"
+        assert self.patch_size is not None, "Selection of random patches requires size of a patch"
+
+        batch_size = self.batch_size
+        assert math.isqrt(batch_size), "Batch size must be quadratic"
+        num_imgs = self.num_imgs
+        patch_size = self.patch_size
+
+        window_size = math.sqrt(batch_size)
+        
+        assert window_size % patch_size == 0, f"Patches of {patch_size}x{patch_size} don't fit perfectly into {int(window_size)}x{int(window_size)} window"
+
+        num_patches_in_window = int(window_size / patch_size)**2
+
+        if patch_size == 1:
+            return self.get_rand_ids(index)
+        else:
+            patches = []
+            for i in range(num_patches_in_window):
+                image_idx = torch.randint(0, num_imgs, size=(1,)).item()
+                patch_indices = self.get_rand_patch_v2(image_idx)
+                patches.extend(patch_indices)
+            return patches
 
     def __len__(self):
         if self.split == 'train':
@@ -143,7 +192,7 @@ class BaseDataset(Dataset, ABC):
     def __getitem__(self, index, return_idxs: bool = False):
         if self.split == 'train':
             if self.is_robust_loss_enabled:
-                index = self.get_rand_patch()
+                index = self.construct_random_patch(index)
             else:
                 index = self.get_rand_ids(index)
         out = {}
@@ -153,6 +202,13 @@ class BaseDataset(Dataset, ABC):
             out["rays_d"] = self.rays_d[index]
         if self.imgs is not None: # [64000000, 4]
             out["imgs"] = self.imgs[index] #[4096, 4]
+            # Debug purposes
+            reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 64, 64, 4)
+            patch = reshaped_imgs.numpy()[0, 0:64, 0:64, :]
+            from PIL import Image
+            import numpy as np
+            image = Image.fromarray((patch * 255).astype(np.uint8))
+            image.save('patch_image.png')
         else:
             out["imgs"] = None
         if return_idxs:

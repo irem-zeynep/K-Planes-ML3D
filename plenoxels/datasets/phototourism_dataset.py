@@ -42,7 +42,9 @@ class PhotoTourismDataset(BaseDataset):
                  scene_bbox: Optional[List] = None,
                  global_translation: List[float] = None,
                  global_scale: List[float] = None,
-                 downsample: float = 1.0):
+                 downsample: float = 1.0,
+                 is_robust_loss_enabled: Optional[bool] = False,
+                 patch_size: Optional[int] = None,):
         if ndc:
             raise NotImplementedError("PhotoTourism only handles contraction and standard.")
         if downsample != 1.0:
@@ -124,6 +126,9 @@ class PhotoTourismDataset(BaseDataset):
             rays_d=rays_d,  # noqa
             intrinsics=intrinsics,
             imgs=images,  # noqa
+            num_imgs=self.num_images,
+            is_robust_loss_enabled=is_robust_loss_enabled,
+            patch_size=patch_size
         )
         log.info(f"PhotoTourismDataset contracted={self.is_contracted}, ndc={self.is_ndc}. "
                  f"Loaded {self.split} set from {self.datadir}: "

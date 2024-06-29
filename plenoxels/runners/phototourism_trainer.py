@@ -32,10 +32,12 @@ class PhototourismTrainer(BaseTrainer):
                  valid_every: int,
                  save_outputs: bool,
                  device: Union[str, torch.device],
+                 robustnerf,
                  **kwargs
                  ):
         self.train_dataset = tr_dset
         self.test_dataset = ts_dset
+        self.robustnerf = robustnerf
         super().__init__(
             train_data_loader=tr_loader,
             num_steps=num_steps,
@@ -46,6 +48,7 @@ class PhototourismTrainer(BaseTrainer):
             valid_every=valid_every,
             save_outputs=save_outputs,
             device=device,
+            robustnerf=robustnerf,
             **kwargs)
 
     def eval_step(self, data, **kwargs) -> MutableMapping[str, torch.Tensor]:
@@ -77,8 +80,8 @@ class PhototourismTrainer(BaseTrainer):
                         preds[k].append(v.cpu())
         return {k: torch.cat(v, 0) for k, v in preds.items()}
 
-    def train_step(self, data: Dict[str, Union[int, torch.Tensor]], **kwargs):
-        return super().train_step(data, **kwargs)
+    def train_step(self, data: Dict[str, Union[int, torch.Tensor]], loss_threshold, **kwargs):
+        return super().train_step(data, loss_threshold, **kwargs)
 
     def post_step(self, progress_bar):
         return super().post_step(progress_bar)
@@ -259,12 +262,16 @@ class PhototourismTrainer(BaseTrainer):
 
 def init_tr_data(data_downsample, data_dir, **kwargs):
     batch_size = kwargs['batch_size']
+    is_robust_loss_enabled = kwargs['robustnerf']['enable']
+    patch_size = kwargs['robustnerf']['patch_size']
     log.info(f"Loading PhotoTourismDataset with downsample={data_downsample}")
     tr_dset = PhotoTourismDataset(
         data_dir, split='train', batch_size=batch_size,
         contraction=kwargs['contract'], ndc=kwargs['ndc'],
         scene_bbox=kwargs['scene_bbox'], global_scale=kwargs.get('global_scale', None),
         global_translation=kwargs.get('global_translation', None),
+        is_robust_loss_enabled=is_robust_loss_enabled,
+        patch_size=patch_size
     )
     tr_loader = torch.utils.data.DataLoader(
         tr_dset, batch_size=None, num_workers=4,  prefetch_factor=4, pin_memory=True,

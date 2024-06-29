@@ -104,7 +104,8 @@ class BaseDataset(Dataset, ABC):
             else:
                 return torch.randint(0, self.num_samples, size=(batch_size, ))
 
-    def get_rand_patch(self, image_idx):
+    # Get random patches from images with same sizes
+    def get_rand_patch_static(self, image_idx):
         img_h = self.img_h
         img_w = self.img_w
         patch_size = self.patch_size
@@ -118,6 +119,30 @@ class BaseDataset(Dataset, ABC):
         for r in range(patch_size):
             for c in range(patch_size):
                 original_index = image_idx * (img_h * img_w) + (row_start + r) * img_w + (col_start + c)
+                index.append(original_index)
+        index = np.asarray(index)
+
+        return index
+    
+    # Get random patches from images with dynamic sizes
+    def get_rand_patch_dynamic(self, image_idx):
+        img_h = self.img_h[image_idx]
+        img_w = self.img_w[image_idx]
+        patch_size = self.patch_size
+
+        max_row_start = img_h - patch_size
+        max_col_start = img_w - patch_size
+        row_start = torch.randint(0, max_row_start + 1, (1,)).item()
+        col_start = torch.randint(0, max_col_start + 1, (1,)).item()
+
+        current_img_start = 0
+        for i in range(image_idx):
+            current_img_start += self.img_h[i] * self.img_w[i]
+
+        index = []
+        for r in range(patch_size):
+            for c in range(patch_size):
+                original_index = current_img_start + (row_start + r) * img_w + (col_start + c)
                 index.append(original_index)
         index = np.asarray(index)
 
@@ -167,7 +192,11 @@ class BaseDataset(Dataset, ABC):
             patches = []
             for i in range(num_patches_in_axis ** 2):
                 image_idx = torch.randint(0, num_imgs, size=(1,)).item()
-                patch_indices = self.get_rand_patch(image_idx)
+                # PhotoTourism e.g. has images of different sizes.
+                if type(self.img_h) is list:
+                    patch_indices = self.get_rand_patch_dynamic(image_idx)
+                else:
+                    patch_indices = self.get_rand_patch_static(image_idx)
                 patches.append(patch_indices.reshape(patch_size, patch_size))
 
             patches = np.asarray(patches)
@@ -196,8 +225,8 @@ class BaseDataset(Dataset, ABC):
         if self.imgs is not None: # [64000000, 4]
             out["imgs"] = self.imgs[index] #[4096, 4]
             # Debug purposes
-            # reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 64, 64, 4)
-            # patch = reshaped_imgs.numpy()[0, 0:64, 0:64, :]
+            # reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 128, 128, 3)
+            # patch = reshaped_imgs.numpy()[0, 0:128, 0:128, :]
             # from PIL import Image
             # image = Image.fromarray((patch * 255).astype(np.uint8))
             # image.save('patch_image.png')

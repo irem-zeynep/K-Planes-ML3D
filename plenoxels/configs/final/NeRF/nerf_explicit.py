@@ -56,14 +56,14 @@ config = {
  # RobustNeRF
  'robustnerf': {
    'enable': True,
-   'patch_size': 32,
+   'patch_size': 8,
+   # inner_patch_size must be smaller than patch_size
+   'inner_patch_size': 4,
    'inlier_quantile': 0.5,
    'inner_patch_inlier_quantile': 0.5,
    'smoothed_filter_size': 3,
    'inner_patch_size': 8,
    'smoothed_filter_size': 3,
    'smoothed_inlier_quantile': 0.5,
-   'patch_size2': 64,
-   'inner_patch_size': 32
  }
 }

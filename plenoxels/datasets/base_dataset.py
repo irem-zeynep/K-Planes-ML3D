@@ -171,6 +171,8 @@ class BaseDataset(Dataset, ABC):
                 patches.append(patch_indices.reshape(patch_size, patch_size))
 
             patches = np.asarray(patches)
+
+            # This rearranges the indices of the patches, so they are together as a block and not as a line!
             patches = self.rearrange_indices(patches, num_patches_in_axis)
             return patches
 

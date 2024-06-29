@@ -6,6 +6,32 @@ import numpy as np
 import jax.numpy as jnp
 import torch
 
+# This method tries to put all indices of a patch in consecutive order, so it can extract each patch as a block
+def get_patch_batches(errors, batch_size, patch_size, channels):
+  window_size = int(np.sqrt(batch_size))
+  num_patches_in_axis = int(window_size / patch_size)
+  num_patches = num_patches_in_axis ** 2
+  num_split_patches = num_patches * patch_size
+
+  errors = errors.reshape(num_split_patches, patch_size, channels)
+
+  all_patches = []
+  for i in range(num_patches_in_axis):
+      some_patches = errors[i::patch_size]
+      some_patches = some_patches.reshape(int(num_patches / num_patches_in_axis), patch_size, patch_size, channels)
+      all_patches.append(some_patches)
+
+  all_patches = np.asarray(all_patches)
+
+  end_array = []
+  for i in range(num_patches_in_axis):
+      for group in all_patches:
+          end_array.append(group[i])
+
+  end_array = np.asarray(end_array)
+  end_array = end_array.reshape(num_patches * patch_size * patch_size, 1, channels)
+  end_array = end_array.reshape(num_patches, patch_size, patch_size, channels)
+  return end_array
 
 def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, Mapping[str, np.ndarray]]:
   """Computes RobustNeRF mask.
@@ -22,8 +48,11 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   """
   epsilon = 1e-3
   #errors = jnp.array(errors.cpu().detach().numpy()) # [4096, 3]
-  batch_size, _ = errors.shape
-  errors = jnp.array(errors.view(1, config['patch_size2'], config['patch_size2'], 3).cpu().detach().numpy())
+  batch_size, channels = errors.shape
+
+  #errors = jnp.array(errors.view(1, config['patch_size2'], config['patch_size2'], 3).cpu().detach().numpy())
+  errors = get_patch_batches(errors.cpu().detach().numpy(), batch_size, config['patch_size'], channels)
+  errors = jnp.array(errors)
 
   error_dtype = errors.dtype
 
@@ -76,7 +105,7 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
   # smaller than patch_size. Default is for the inner patch size to be half
   # the input patch size (i.e. 16x16 -> 8x8).
   inner_patch_mask = _robustnerf_inner_patch_mask(
-      config['inner_patch_size'], config['patch_size2']
+      config['inner_patch_size'], config['patch_size']
   )
 
   is_inlier_patch = jnp.mean(
@@ -99,7 +128,6 @@ def robustnerf_mask(errors, loss_threshold: float, config) -> Tuple[np.ndarray, 
 
   stats['mask'] = jnp.mean(mask)
 
-  # TODO replace hard coded values
   mask = np.array(mask).reshape((batch_size, 1))
   mask = torch.from_numpy(np.array(mask))
   return mask, stats

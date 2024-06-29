@@ -104,41 +104,7 @@ class BaseDataset(Dataset, ABC):
             else:
                 return torch.randint(0, self.num_samples, size=(batch_size, ))
 
-    def get_rand_patch(self):
-        assert self.batch_size is not None, "Can't get rand_patches for test split"
-        assert self.num_imgs is not None, "Selection of random patch needs number of total train images"
-        batch_size = self.batch_size
-        num_imgs = self.num_imgs
-        img_h = self.img_h
-        img_w = self.img_w
-
-        assert torch.equal(torch.sqrt(torch.tensor(batch_size)), torch.sqrt(torch.tensor(batch_size)).round()), "Patch size must be quadratic"
-        patch_height = int(torch.sqrt(torch.tensor(batch_size)).item())
-        patch_width = int(torch.sqrt(torch.tensor(batch_size)).item())
-
-        image_idx = torch.randint(0, num_imgs, size=(1,)).item()
-
-        max_row_start = img_h - patch_height
-        max_col_start = img_w - patch_width
-        row_start = torch.randint(0, max_row_start + 1, (1,)).item()
-        col_start = torch.randint(0, max_col_start + 1, (1,)).item()
-        
-        # Debug purposes
-        # reshaped_imgs = self.imgs.clone().detach().view(num_imgs, img_h, img_w, 4)
-        # patch = reshaped_imgs.numpy()[image_idx, row_start:row_start+patch_height, col_start:col_start+patch_width, :]
-        # image = Image.fromarray((patch * 255).astype(np.uint8))
-        # image.save('patch_image.png')
-
-        index = []
-        for r in range(patch_height):
-            for c in range(patch_width):
-                original_index = image_idx * (img_h * img_w) + (row_start + r) * img_w + (col_start + c)
-                index.append(original_index)
-        index = torch.tensor(index)
-
-        return index
-    
-    def get_rand_patch_v2(self, image_idx):
+    def get_rand_patch(self, image_idx):
         img_h = self.img_h
         img_w = self.img_w
         patch_size = self.patch_size
@@ -201,7 +167,7 @@ class BaseDataset(Dataset, ABC):
             patches = []
             for i in range(num_patches_in_axis ** 2):
                 image_idx = torch.randint(0, num_imgs, size=(1,)).item()
-                patch_indices = self.get_rand_patch_v2(image_idx)
+                patch_indices = self.get_rand_patch(image_idx)
                 patches.append(patch_indices.reshape(patch_size, patch_size))
 
             patches = np.asarray(patches)
@@ -228,11 +194,11 @@ class BaseDataset(Dataset, ABC):
         if self.imgs is not None: # [64000000, 4]
             out["imgs"] = self.imgs[index] #[4096, 4]
             # Debug purposes
-            reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 64, 64, 4)
-            patch = reshaped_imgs.numpy()[0, 0:64, 0:64, :]
-            from PIL import Image
-            image = Image.fromarray((patch * 255).astype(np.uint8))
-            image.save('patch_image.png')
+            # reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 64, 64, 4)
+            # patch = reshaped_imgs.numpy()[0, 0:64, 0:64, :]
+            # from PIL import Image
+            # image = Image.fromarray((patch * 255).astype(np.uint8))
+            # image.save('patch_image.png')
         else:
             out["imgs"] = None
         if return_idxs:

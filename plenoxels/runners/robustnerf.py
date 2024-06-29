@@ -13,6 +13,10 @@ def get_patch_batches(errors, batch_size, patch_size, channels):
   num_patches = num_patches_in_axis ** 2
   num_split_patches = num_patches * patch_size
 
+  if num_patches == 1:
+     return errors.reshape(1, patch_size, patch_size, channels)
+
+  # TODO take a look here again. Might not make sense...
   errors = errors.reshape(num_split_patches, patch_size, channels)
 
   all_patches = []

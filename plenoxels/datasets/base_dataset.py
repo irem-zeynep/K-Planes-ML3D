@@ -8,6 +8,8 @@ from torch.utils.data import Dataset
 from .intrinsics import Intrinsics
 
 import numpy as np
+import math
+import time
 
 class BaseDataset(Dataset, ABC):
     def __init__(self,
@@ -62,6 +64,15 @@ class BaseDataset(Dataset, ABC):
         self.num_imgs = num_imgs
         self.is_robust_loss_enabled = is_robust_loss_enabled
         self.patch_size = patch_size
+
+        if type(self.img_h) is list:
+            self.img_start_index = []
+            for j in range(len(self.img_h)):
+                current_img_start = 0
+                for i in range(j):
+                    current_img_start += self.img_h[i] * self.img_w[i]
+                self.img_start_index.append(current_img_start)
+
 
     @property
     def img_h(self) -> Union[int, List[int]]:
@@ -135,22 +146,16 @@ class BaseDataset(Dataset, ABC):
         row_start = torch.randint(0, max_row_start + 1, (1,)).item()
         col_start = torch.randint(0, max_col_start + 1, (1,)).item()
 
-        current_img_start = 0
-        for i in range(image_idx):
-            current_img_start += self.img_h[i] * self.img_w[i]
-
         index = []
         for r in range(patch_size):
             for c in range(patch_size):
-                original_index = current_img_start + (row_start + r) * img_w + (col_start + c)
+                original_index = self.img_start_index[image_idx] + (row_start + r) * img_w + (col_start + c)
                 index.append(original_index)
         index = np.asarray(index)
 
         return index
     
     def construct_random_patch(self, index):
-        import math
-
         assert self.batch_size is not None, "Can't get rand_patches for test split"
         assert self.num_imgs is not None, "Selection of random patches requires number of total train images"
         assert self.patch_size is not None, "Selection of random patches requires size of a patch"

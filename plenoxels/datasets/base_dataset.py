@@ -148,26 +148,6 @@ class BaseDataset(Dataset, ABC):
 
         return index
     
-    # TODO translate to numpy
-    def rearrange_indices(self, blocks, num_patches_in_axis):
-        end_block = []
-        unit_block = []
-
-        cnt = 0
-        for block in blocks:
-            if cnt < num_patches_in_axis:
-                unit_block.append(block.copy())
-                cnt += 1
-
-                if cnt == num_patches_in_axis:
-                    end_block.append(unit_block.copy())
-                    unit_block = []
-                    cnt = 0
-
-        res = np.block(end_block)
-        return res.flatten()
-
-    
     def construct_random_patch(self, index):
         import math
 
@@ -197,12 +177,10 @@ class BaseDataset(Dataset, ABC):
                     patch_indices = self.get_rand_patch_dynamic(image_idx)
                 else:
                     patch_indices = self.get_rand_patch_static(image_idx)
-                patches.append(patch_indices.reshape(patch_size, patch_size))
+                patches.append(patch_indices)
 
             patches = np.asarray(patches)
-
-            # This rearranges the indices of the patches, so they are together as a block and not as a line!
-            patches = self.rearrange_indices(patches, num_patches_in_axis)
+            patches = patches.flatten()
             return patches
 
     def __len__(self):
@@ -224,12 +202,13 @@ class BaseDataset(Dataset, ABC):
             out["rays_d"] = self.rays_d[index]
         if self.imgs is not None: # [64000000, 4]
             out["imgs"] = self.imgs[index] #[4096, 4]
-            # Debug purposes
-            # reshaped_imgs = out["imgs"].cpu().clone().detach().view(1, 128, 128, 3)
-            # patch = reshaped_imgs.numpy()[0, 0:128, 0:128, :]
+
+            # # Debug purposes
             # from PIL import Image
-            # image = Image.fromarray((patch * 255).astype(np.uint8))
-            # image.save('patch_image.png')
+            # reshaped_patches = out["imgs"].cpu().clone().detach().view(4, 64, 64, 3).numpy()
+            # for i, patch in enumerate(reshaped_patches):
+            #     patch = Image.fromarray((patch).astype(np.uint8))
+            #     patch.save(f'test/output/patch_image_{i}.png')
         else:
             out["imgs"] = None
         if return_idxs:

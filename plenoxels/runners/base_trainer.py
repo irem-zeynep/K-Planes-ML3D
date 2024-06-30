@@ -89,15 +89,14 @@ class BaseTrainer(abc.ABC):
             # Regularization
             loss = recon_loss
             if self.robustnerf['enable']:
-                resid_sq = (fwd_out['rgb'] -  data['imgs'])**2
-
                 # Debug purposes
-                # reshaped_imgs = data['imgs'].cpu().clone().detach().view(1, 64, 64, 3)
-                # patch = reshaped_imgs.numpy()[0, 0:0+64, 0:0+64, :]
                 # from PIL import Image
-                # image = Image.fromarray((patch * 255).astype(np.uint8))
-                # image.save('patch_image.png')
+                # reshaped_patches = data["imgs"].cpu().clone().detach().view(4, 64, 64, 3).numpy()
+                # for i, patch in enumerate(reshaped_patches):
+                #     patch = Image.fromarray((patch * 255).astype(np.uint8))
+                #     patch.save(f'test/output/patch_image_{i}.png')
 
+                resid_sq = (fwd_out['rgb'] - data['imgs'])**2
                 mask, robust_stats = robustnerf_mask(resid_sq, loss_threshold, self.robustnerf)
                 mask = mask.to(self.device)
                 loss = resid_sq * mask

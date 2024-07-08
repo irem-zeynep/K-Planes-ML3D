@@ -11,6 +11,8 @@ import numpy as np
 import math
 import time
 
+import csv
+
 class BaseDataset(Dataset, ABC):
     def __init__(self,
                  datadir: str,
@@ -28,6 +30,7 @@ class BaseDataset(Dataset, ABC):
                  num_imgs: Optional[int] = None,
                  is_robust_loss_enabled: Optional[bool] = False,
                  patch_size: Optional[int] = None,
+                 log_dir: Optional[str] = None,
                  ):
         self.datadir = datadir
         self.name = os.path.basename(self.datadir)
@@ -64,14 +67,21 @@ class BaseDataset(Dataset, ABC):
         self.num_imgs = num_imgs
         self.is_robust_loss_enabled = is_robust_loss_enabled
         self.patch_size = patch_size
+        if self.is_robust_loss_enabled:
+            self.log_dir = log_dir
+            self.patch_log_file = os.path.join(log_dir, "patch_logger.csv")
+            with open(self.patch_log_file, mode='w', newline='') as file:
+                writer = csv.writer(file)
+                # Write the header
+                writer.writerow(['Patch Index', 'Patches in Batch', 'Image Index', 'Starting Row Index', 'Starting Column Index', 'Patch Size', 'Pixel Indices'])
 
-        if type(self.img_h) is list:
-            self.img_start_index = []
-            for j in range(len(self.img_h)):
-                current_img_start = 0
-                for i in range(j):
-                    current_img_start += self.img_h[i] * self.img_w[i]
-                self.img_start_index.append(current_img_start)
+            if type(self.img_h) is list:
+                self.img_start_index = []
+                for j in range(len(self.img_h)):
+                    current_img_start = 0
+                    for i in range(j):
+                        current_img_start += self.img_h[i] * self.img_w[i]
+                    self.img_start_index.append(current_img_start)
 
 
     @property
@@ -116,7 +126,7 @@ class BaseDataset(Dataset, ABC):
                 return torch.randint(0, self.num_samples, size=(batch_size, ))
 
     # Get random patches from images with same sizes
-    def get_rand_patch_static(self, image_idx):
+    def get_rand_patch_static(self, image_idx, log_file, patch_index, patches_in_batch):
         img_h = self.img_h
         img_w = self.img_w
         patch_size = self.patch_size
@@ -131,12 +141,16 @@ class BaseDataset(Dataset, ABC):
             for c in range(patch_size):
                 original_index = image_idx * (img_h * img_w) + (row_start + r) * img_w + (col_start + c)
                 index.append(original_index)
-        index = np.asarray(index)
 
+        # Log patch indices
+        writer = csv.writer(log_file)
+        writer.writerow([patch_index, patches_in_batch, image_idx, row_start, col_start, patch_size, index])
+
+        index = np.asarray(index)    
         return index
     
     # Get random patches from images with dynamic sizes
-    def get_rand_patch_dynamic(self, image_idx):
+    def get_rand_patch_dynamic(self, image_idx, log_file, patch_index, patches_in_batch):
         img_h = self.img_h[image_idx]
         img_w = self.img_w[image_idx]
         patch_size = self.patch_size
@@ -151,8 +165,12 @@ class BaseDataset(Dataset, ABC):
             for c in range(patch_size):
                 original_index = self.img_start_index[image_idx] + (row_start + r) * img_w + (col_start + c)
                 index.append(original_index)
+        
+        # Log patch indices
+        writer = csv.writer(log_file)
+        writer.writerow([patch_index, patches_in_batch, image_idx, row_start, col_start, patch_size, index])
+        
         index = np.asarray(index)
-
         return index
     
     def construct_random_patch(self, index):
@@ -160,33 +178,34 @@ class BaseDataset(Dataset, ABC):
         assert self.num_imgs is not None, "Selection of random patches requires number of total train images"
         assert self.patch_size is not None, "Selection of random patches requires size of a patch"
 
-        batch_size = self.batch_size
-        assert math.isqrt(batch_size), "Batch size must be quadratic"
-        num_imgs = self.num_imgs
-        patch_size = self.patch_size
+        with open(self.patch_log_file, mode='a', newline='') as file:
+            batch_size = self.batch_size
+            assert math.isqrt(batch_size), "Batch size must be quadratic"
+            num_imgs = self.num_imgs
+            patch_size = self.patch_size
 
-        window_size = math.sqrt(batch_size)
-        
-        assert window_size % patch_size == 0, f"Patches of {patch_size}x{patch_size} don't fit perfectly into {int(window_size)}x{int(window_size)} window"
+            window_size = math.sqrt(batch_size)
+            
+            assert window_size % patch_size == 0, f"Patches of {patch_size}x{patch_size} don't fit perfectly into {int(window_size)}x{int(window_size)} window"
 
-        num_patches_in_axis = int(window_size / patch_size)
+            num_patches_in_axis = int(window_size / patch_size)
 
-        if patch_size == 1:
-            return self.get_rand_ids(index)
-        else:
-            patches = []
-            for i in range(num_patches_in_axis ** 2):
-                image_idx = torch.randint(0, num_imgs, size=(1,)).item()
-                # PhotoTourism e.g. has images of different sizes.
-                if type(self.img_h) is list:
-                    patch_indices = self.get_rand_patch_dynamic(image_idx)
-                else:
-                    patch_indices = self.get_rand_patch_static(image_idx)
-                patches.append(patch_indices)
+            if patch_size == 1:
+                return self.get_rand_ids(index)
+            else:
+                patches = []
+                for i in range(num_patches_in_axis ** 2):
+                    image_idx = torch.randint(0, num_imgs, size=(1,)).item()
+                    # PhotoTourism e.g. has images of different sizes.
+                    if type(self.img_h) is list:
+                        patch_indices = self.get_rand_patch_dynamic(image_idx, file, i, num_patches_in_axis ** 2)
+                    else:
+                        patch_indices = self.get_rand_patch_static(image_idx, file, i, num_patches_in_axis ** 2)
+                    patches.append(patch_indices)
 
-            patches = np.asarray(patches)
-            patches = patches.flatten()
-            return patches
+                patches = np.asarray(patches)
+                patches = patches.flatten()
+                return patches
 
     def __len__(self):
         if self.split == 'train':

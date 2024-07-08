@@ -13,7 +13,7 @@ config = {
 
  # Optimization settings
  'num_steps': 30001,
- 'batch_size': 16384,
+ 'batch_size': 4096,
  'optim_type': 'adam',
  'scheduler_type': 'warmup_cosine',
  'lr': 0.01,
@@ -61,15 +61,13 @@ config = {
 
  # RobustNeRF
  'robustnerf': {
-  'enable': True,
-  'patch_size': 128,
-  # inner_patch_size must be smaller than patch_size
-  'inner_patch_size': 4,
-  'inlier_quantile': 0.5,
-  'inner_patch_inlier_quantile': 0.5,
-  'smoothed_filter_size': 3,
-  'inner_patch_size': 8,
-  'smoothed_filter_size': 3,
-  'smoothed_inlier_quantile': 0.5,
+   'enable': False,
+   'patch_size': 8,
+   # inner_patch_size must be smaller than patch_size
+   'inner_patch_size': 4,
+   'inlier_quantile': 0.5,
+   'inner_patch_inlier_quantile': 0.5,
+   'smoothed_filter_size': 3,
+   'smoothed_inlier_quantile': 0.5,
  }
 }

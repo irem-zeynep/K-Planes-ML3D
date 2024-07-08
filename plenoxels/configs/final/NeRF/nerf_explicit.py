@@ -1,6 +1,6 @@
 config = {
  'expname': 'lego_explicit',
- 'logdir': './logs/syntheticstatic',
+ 'logdir': './logs/syntheticstatic_batchsize-16384_patchsize-4',
  'device': 'cuda:0',
 
  'data_downsample': 1.0,
@@ -9,8 +9,8 @@ config = {
  'ndc': False,
 
  # Optimization settings
- 'num_steps': 30001,
- 'batch_size': 4096,
+ 'num_steps': 60001,
+ 'batch_size': 16384,
  'optim_type': 'adam',
  'scheduler_type': 'warmup_cosine',
  'lr': 0.01,
@@ -22,8 +22,8 @@ config = {
  'distortion_loss_weight': 0.001,
 
  # Training settings
- 'save_every': 30000,
- 'valid_every': 30000,
+ 'save_every': 60000,
+ 'valid_every': 60000,
  'save_outputs': True,
  'train_fp16': True,
 
@@ -61,8 +61,6 @@ config = {
    'inner_patch_size': 4,
    'inlier_quantile': 0.5,
    'inner_patch_inlier_quantile': 0.5,
-   'smoothed_filter_size': 3,
-   'inner_patch_size': 8,
    'smoothed_filter_size': 3,
    'smoothed_inlier_quantile': 0.5,
  }

@@ -264,6 +264,7 @@ def init_tr_data(data_downsample, data_dir, **kwargs):
     batch_size = kwargs['batch_size']
     is_robust_loss_enabled = kwargs['robustnerf']['enable']
     patch_size = kwargs['robustnerf']['patch_size']
+    log_dir = kwargs['logdir']
     log.info(f"Loading PhotoTourismDataset with downsample={data_downsample}")
     tr_dset = PhotoTourismDataset(
         data_dir, split='train', batch_size=batch_size,
@@ -271,7 +272,8 @@ def init_tr_data(data_downsample, data_dir, **kwargs):
         scene_bbox=kwargs['scene_bbox'], global_scale=kwargs.get('global_scale', None),
         global_translation=kwargs.get('global_translation', None),
         is_robust_loss_enabled=is_robust_loss_enabled,
-        patch_size=patch_size
+        patch_size=patch_size,
+        log_dir=log_dir
     )
     tr_loader = torch.utils.data.DataLoader(
         tr_dset, batch_size=None, num_workers=4,  prefetch_factor=4, pin_memory=True,

@@ -21,6 +21,7 @@ class SyntheticNerfDataset(BaseDataset):
                  max_frames: Optional[int] = None,
                  is_robust_loss_enabled: Optional[bool] = False,
                  patch_size: Optional[int] = None,
+                 log_dir: Optional[str] = None,
                  ):
         self.downsample = downsample
         self.max_frames = max_frames
@@ -58,7 +59,8 @@ class SyntheticNerfDataset(BaseDataset):
             intrinsics=intrinsics,
             num_imgs=num_imgs,
             is_robust_loss_enabled=is_robust_loss_enabled,
-            patch_size=patch_size
+            patch_size=patch_size,
+            log_dir=log_dir
         )
         log.info(f"SyntheticNerfDataset. Loaded {split} set from {datadir}."
                  f"{len(poses)} images of shape {self.img_h}x{self.img_w}. "

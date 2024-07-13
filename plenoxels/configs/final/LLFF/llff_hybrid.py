@@ -1,13 +1,13 @@
 # configuration file to be used with `main.py` for normal (or multiscene) training
 # the configuration must be specified in a dictionary called `config`.
 config = {
-    "expname": "fortress_hybrid",
+    "expname": "fern_with_depth_loss",
     "logdir": "./logs/staticreal",
     "device": "cuda:0",
 
     # Data settings
     "data_downsample": 4,
-    "data_dirs": ["data/LLFF/fortress"],
+    "data_dirs": ["/media/marco/ext_2tb/tmp/nerf_llff_data/fern"],
     # Data settings for LLFF
     "hold_every": 8,
     "contract": False,
@@ -60,4 +60,12 @@ config = {
         "grid_dimensions": 2,
         "resolution": [64, 64, 64],
     }],
+
+    # Depth Loss
+    'depth_loss': {
+        'enable': True,
+        'weighted': False,
+        'relative_loss': False,
+        'alpha': 0.1
+    }
 }

@@ -5,6 +5,7 @@ from typing import Tuple, Optional, List
 
 import numpy as np
 import torch
+import random
 
 from .data_loading import parallel_load_images
 from .ray_utils import (
@@ -116,18 +117,64 @@ class LLFFDataset(BaseDataset):
         camera_dirs = stack_camera_dirs(x, y, self.intrinsics, True)  # [num_rays, 3]
         rays_o, rays_d = get_rays(camera_dirs, c2w, ndc=self.is_ndc, ndc_near=1.0,
                                   intrinsics=self.intrinsics, normalize_rd=True)  # h*w, 3
-       
-        rays_depth = np.stack((rays_o, rays_d), axis=0) # 2 x N x 3
-        rays_depth = np.transpose(rays_depth, [1,0,2])
 
-        depth_index = image_id.numpy()[0]
-        depth_value = np.repeat(self.depth_data[depth_index]['depth'][:,None,None], 3, axis=2) # N x 1 x 3
-        weights = np.repeat(self.depth_data[depth_index]['error'][:,None,None], 3, axis=2) # N x 1 x 3
-        rays_depth = np.concatenate([depth_value, weights], axis=1) # N x 4 x 3
+        if self.split == 'train':
+            K = 241 # Ideally we would make this configurable
+            x = []
+            y = []
+            depth = []
+            weight = []
+            image_ids = []
+
+            train_image_ids = torch.unique(image_id)
+            for image_id in train_image_ids:
+                coords  = self.depth_data[image_id]['coord']  # Shape [N, 2]
+                depths  = self.depth_data[image_id]['depth']  # Shape [N]
+                weights = self.depth_data[image_id]['error']  # Shape [N]
+
+                N = coords.shape[0]
+                k = min(K,N)
+
+                # Randomly select K indices from the range [0, N)
+                random_indices = random.sample(range(N), k)
+
+                # Append the sampled coordinates, depths, and image IDs to the lists
+                x.extend(coords[random_indices][:, 0].tolist())
+                y.extend(coords[random_indices][:, 1].tolist())
+                depth.extend(depths[random_indices].tolist())
+                weight.extend(weights[random_indices].tolist())
+                image_ids.extend([image_id] * k)
+
+            # Convert lists to torch tensors,
+            # For now, we need equal dimensions as the rays sampled for the reconstruction loss
+            size        = index.size()[0]
+            x           = torch.tensor(x[:size])
+            y           = torch.tensor(y[:size])
+            depth       = torch.tensor(depth[:size])
+            weight      = torch.tensor(weight[:size])
+            image_ids   = torch.tensor(image_ids[:size])
+        else:
+            image_ids   = [index]
+            x, y        = self.depth_data[image_ids]['coord']
+            depth       = self.depth_data[image_ids]['depth']
+            weight      = self.depth_data[image_ids]['error']
+        out = {"near_fars": self.near_fars[image_ids, :].view(-1, 2)}
+        if self.imgs is not None:
+            out["imgs"] = self.imgs[index] / 255.0  # (num_rays, 3)   this converts to f32
+        else:
+            out["imgs"] = None
+
+        c2w = self.poses[image_ids]       # (num_rays, 3, 4)
+        camera_dirs = stack_camera_dirs(x, y, self.intrinsics, True)  # [num_rays, 3]
+        rays_sparse_o, rays_sparse_d = get_rays(camera_dirs, c2w, ndc=self.is_ndc, ndc_near=1.0,
+                                                intrinsics=self.intrinsics, normalize_rd=True)  # h*w, 3
         
         out["rays_o"] = rays_o
         out["rays_d"] = rays_d
-        out["rays_depth"] = rays_depth
+        out["rays_sparse_o"] = rays_sparse_o
+        out["rays_sparse_d"] = rays_sparse_d
+        out["sparse_depth"] = depth
+        out["sparse_weight"] = weight
         out["bg_color"] = torch.tensor([[1.0, 1.0, 1.0]])
         return out
 

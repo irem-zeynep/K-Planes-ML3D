@@ -90,21 +90,25 @@ class BaseTrainer(abc.ABC):
 
             depth_loss = 0  
             if self.depth_loss_conf['enable']:
-                # TODO get target and weights
-                target_depth = data['rays_depth']
-                ray_weights = data['rays_depth']
+                fwd_sparse_out = self.model(
+                    data['rays_sparse_o'], data['rays_sparse_d'], bg_color=data['bg_color'],
+                    near_far=data['near_fars'], timestamps=None)
+
+                target_depth = data['sparse_depth']
+                ray_weights = data['sparse_weight']
 
                 if self.depth_loss_conf["weighted"]:
                     if not self.depth_loss_conf["normalize_depth"]:
-                        depth_loss = torch.mean(((fwd_out['depth'] - target_depth) ** 2) * ray_weights)
-                    else: # todo fix normalized loss (replace / 1 with / max depth)
-                        depth_loss = torch.mean((((fwd_out['depth']  - target_depth) / 1) ** 2) * ray_weights)
+                        depth_loss = torch.mean(((fwd_sparse_out['depth'] - target_depth) ** 2) * ray_weights)
+                    else:
+                        max_depth = target_depth.max() # TODO: review how to get max depth
+                        depth_loss = torch.mean(((fwd_sparse_out['depth'] - target_depth) / max_depth) ** 2 * ray_weights)
                 elif self.depth_loss_conf["relative_loss"]:
-                    depth_loss = torch.mean(((fwd_out['depth']  - target_depth) / target_depth)**2)
+                    depth_loss = torch.mean(((fwd_sparse_out['depth']  - target_depth) / target_depth)**2)
                 else:
-                    depth_loss = img2mse(fwd_out['depth'] , target_depth)
+                    depth_loss = img2mse(fwd_sparse_out['depth'] , target_depth)
 
-            loss += + self.depth_loss_conf['alpha'] * depth_loss
+            loss += self.depth_loss_conf['alpha'] * depth_loss
             
             # Regularization
             for r in self.regularizers:
@@ -201,6 +205,10 @@ class BaseTrainer(abc.ABC):
     def _move_data_to_device(self, data):
         data["rays_o"] = data["rays_o"].to(self.device)
         data["rays_d"] = data["rays_d"].to(self.device)
+        data["rays_sparse_o"] = data["rays_sparse_o"].to(self.device)
+        data["rays_sparse_d"] = data["rays_sparse_d"].to(self.device)
+        data["sparse_depth"] = data["sparse_depth"].to(self.device)
+        data["sparse_weight"] = data["sparse_weight"].to(self.device)
         data["imgs"] = data["imgs"].to(self.device)
         data["near_fars"] = data["near_fars"].to(self.device)
         if "timestamps" in data:

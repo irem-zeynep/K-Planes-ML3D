@@ -1,5 +1,5 @@
 config = {
- 'expname': 'brandenburg_explicit',
+ 'expname': 'test',
  'logdir': './logs/brandenburg',
  'device': 'cuda:0',
 
@@ -61,10 +61,10 @@ config = {
 
  # RobustNeRF
  'robustnerf': {
-   'enable': False,
-   'patch_size': 8,
-   # inner_patch_size must be smaller than patch_size
-   'inner_patch_size': 4,
+   'enable': True,
+   'patch_size': 16,
+   # inner_patch_size must be smaller than patch_size. We are making it to half the patch_size by default
+   'inner_patch_size': 8,
    'inlier_quantile': 0.5,
    'inner_patch_inlier_quantile': 0.5,
    'smoothed_filter_size': 3,

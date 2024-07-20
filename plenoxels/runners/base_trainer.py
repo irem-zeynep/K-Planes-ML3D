@@ -129,6 +129,7 @@ class BaseTrainer(abc.ABC):
             with torch.no_grad():
                 recon_loss_val = recon_loss.item()
                 self.loss_info[f"mse"].update(recon_loss_val)
+                self.loss_info[f"depth_loss"].update(depth_loss)
                 self.loss_info[f"psnr"].update(-10 * math.log10(recon_loss_val))
                 for r in self.regularizers:
                     r.report(self.loss_info)

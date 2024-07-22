@@ -72,7 +72,6 @@ class BaseTrainer(abc.ABC):
     def train_step(self, data, **kwargs) -> bool:
         img2mse = lambda x, y : torch.mean((x - y) ** 2)
 
-        stats = {}
         self.model.train()
         data = self._move_data_to_device(data)
         if "timestamps" not in data:

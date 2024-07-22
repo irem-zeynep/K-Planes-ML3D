@@ -154,15 +154,12 @@ class LLFFDataset(BaseDataset):
             weight      = torch.tensor(weight[:size])
             image_ids   = torch.tensor(image_ids[:size])
         else:
-            image_ids   = [index]
-            x, y        = self.depth_data[image_ids]['coord']
+            image_ids   = index
+            coords      = self.depth_data[image_ids]['coord']
             depth       = self.depth_data[image_ids]['depth']
             weight      = self.depth_data[image_ids]['error']
-        out = {"near_fars": self.near_fars[image_ids, :].view(-1, 2)}
-        if self.imgs is not None:
-            out["imgs"] = self.imgs[index] / 255.0  # (num_rays, 3)   this converts to f32
-        else:
-            out["imgs"] = None
+            x = coords[:, 0]
+            y = coords[:, 0]
 
         c2w = self.poses[image_ids]       # (num_rays, 3, 4)
         camera_dirs = stack_camera_dirs(x, y, self.intrinsics, True)  # [num_rays, 3]

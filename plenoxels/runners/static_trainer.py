@@ -149,7 +149,7 @@ def decide_dset_type(dd) -> str:
         return "synthetic"
     elif ("fern" in dd or "flower" in dd or "fortress" in dd
           or "horns" in dd or "leaves" in dd or "orchids" in dd
-          or "room" in dd or "trex" in dd):
+          or "room" in dd or "trex" in dd or "and-bot" in dd or "yoda_origin" in dd):
         return "llff"
     else:
         raise RuntimeError(f"data_dir {dd} not recognized as LLFF or Synthetic dataset.")
@@ -174,7 +174,7 @@ def init_tr_data(data_downsample: float, data_dirs: Sequence[str], **kwargs):
         dset = LLFFDataset(
             data_dir, split='train', downsample=int(data_downsample), hold_every=hold_every,
             batch_size=batch_size, contraction=kwargs['contract'], ndc=kwargs['ndc'],
-            ndc_far=float(kwargs['ndc_far']), near_scaling=float(kwargs['near_scaling']))
+            ndc_far=float(kwargs['ndc_far']), near_scaling=float(kwargs['near_scaling']), is_robust_loss_enabled=is_robust_loss_enabled, patch_size=patch_size, log_dir=log_dir)
     else:
         raise ValueError(f"Dataset type {dset_type} invalid.")
     dset.reset_iter()

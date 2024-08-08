@@ -25,6 +25,9 @@ class LLFFDataset(BaseDataset):
                  ndc: bool = True,
                  near_scaling: float = 0.9,
                  ndc_far: float = 1.0,
+                 is_robust_loss_enabled: Optional[bool] = False,
+                 patch_size: Optional[int] = None,
+                 log_dir: Optional[str] = None,
                  ):
         if (not contraction) and (not ndc):
             raise ValueError("LLFF dataset expects either contraction or NDC to be enabled.")
@@ -78,6 +81,10 @@ class LLFFDataset(BaseDataset):
             intrinsics=intrinsics,
             is_ndc=ndc,
             is_contracted=contraction,
+            num_imgs=num_images,
+            is_robust_loss_enabled=is_robust_loss_enabled,
+            patch_size=patch_size,
+            log_dir=log_dir
         )
         log.info(f"LLFFDataset. {contraction=} {ndc=}. Loaded {split} set from {datadir}. "
                  f"{num_images} poses of shape {self.img_h}x{self.img_w}. "
@@ -89,7 +96,11 @@ class LLFFDataset(BaseDataset):
         w = self.intrinsics.width
         dev = "cpu"
         if self.split == 'train':
-            index = self.get_rand_ids(index)
+            if self.is_robust_loss_enabled:
+                index = self.construct_random_patch(index)
+                index = torch.from_numpy(index)
+            else:
+                index = self.get_rand_ids(index)
             image_id = torch.div(index, h * w, rounding_mode='floor')
             y = torch.remainder(index, h * w).div(w, rounding_mode='floor')
             x = torch.remainder(index, h * w).remainder(w)

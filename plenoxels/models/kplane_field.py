@@ -5,10 +5,10 @@ from typing import Optional, Union, List, Dict, Sequence, Iterable, Collection, 
 import torch
 import torch.nn as nn
 import tinycudann as tcnn
+import numpy as np
 
 from plenoxels.ops.interpolation import grid_sample_wrapper
 from plenoxels.raymarching.spatial_distortions import SpatialDistortion
-
 
 def get_normalized_directions(directions):
     """SH encoding must be in the range [0, 1]
@@ -201,7 +201,7 @@ class KPlaneField(nn.Module):
             )
             self.in_dim_color = (
                     self.direction_encoder.n_output_dims
-                    + self.geo_feat_dim
+                    + self.geo_feat_dim * 2
                     + self.appearance_embedding_dim
             )
             self.color_net = tcnn.Network(
@@ -215,6 +215,29 @@ class KPlaneField(nn.Module):
                     "n_hidden_layers": 2,
                 },
             )
+    
+        num_levels = 16; n_features_per_level = 8; log2_T = 19; base_resolution = 16; per_level_scale=2
+        self.ngp_sigma = tcnn.NetworkWithInputEncoding(
+            n_input_dims=3,
+            n_output_dims=self.geo_feat_dim + 1,
+            encoding_config={
+                "otype": "Grid",
+                "type": "Hash",
+                "n_levels": num_levels,
+                "n_features_per_level": n_features_per_level,
+                "log2_hashmap_size": log2_T,
+                "base_resolution": base_resolution,
+                "per_level_scale": per_level_scale,
+                "interpolation": "Linear"
+            },
+            network_config={
+                "otype": "FullyFusedMLP",
+                "activation": "ReLU",
+                "output_activation": "None",
+                "n_neurons": 64,
+                "n_hidden_layers": 1,
+            },
+        )
 
     def get_density(self, pts: torch.Tensor, timestamps: Optional[torch.Tensor] = None):
         """Computes and returns the densities."""
@@ -241,11 +264,18 @@ class KPlaneField(nn.Module):
             features = self.sigma_net(features)
             features, density_before_activation = torch.split(
                 features, [self.geo_feat_dim, 1], dim=-1)
+            
+            features_ngp = self.ngp_sigma(pts)
+            features_ngp, density_before_activation_ngp = torch.split(features_ngp, [self.geo_feat_dim, 1], dim=-1)
 
+            features_all = torch.cat((features, features_ngp), dim=-1)
+
+        density_before_activation_avg = (density_before_activation + density_before_activation_ngp) / 2.0
         density = self.density_activation(
-            density_before_activation.to(pts)
+            density_before_activation_avg.to(pts)
         ).view(n_rays, n_samples, 1)
-        return density, features
+        
+        return density, features_all
 
     def forward(self,
                 pts: torch.Tensor,
@@ -268,7 +298,7 @@ class KPlaneField(nn.Module):
         if self.linear_decoder:
             color_features = [features]
         else:
-            color_features = [encoded_directions, features.view(-1, self.geo_feat_dim)]
+            color_features = [encoded_directions, features.view(-1, self.geo_feat_dim*2)]
 
         if self.use_appearance_embedding:
             if camera_indices.dtype == torch.float32:

@@ -149,7 +149,7 @@ def decide_dset_type(dd) -> str:
         return "synthetic"
     elif ("fern" in dd or "flower" in dd or "fortress" in dd
           or "horns" in dd or "leaves" in dd or "orchids" in dd
-          or "room" in dd or "trex" in dd or "and-bot" in dd or "yoda_origin" in dd):
+          or "room" in dd or "trex" in dd or "and-bot" in dd or "yoda_origin" in dd or "t_balloon_statue"):
         return "llff"
     else:
         raise RuntimeError(f"data_dir {dd} not recognized as LLFF or Synthetic dataset.")
